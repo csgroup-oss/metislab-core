@@ -1,0 +1,209 @@
+
+include:
+  - project: 'to-be-continuous/docker'
+    ref: '5.12.0'
+    file: '/templates/gitlab-ci-docker.yml'
+
+variables:
+  BASENAME: metislab-core
+  DOCKER_BUILD_TOOL: dind
+  DOCKER_HADOLINT_ARGS: --failure-threshold error
+  DOCKER_HEALTHCHECK_DISABLED: "true"
+
+## Post stage
+
+docker-cleanup:
+  stage: .post
+  image: $DOCKER_IMAGE
+  script:
+    - docker container prune -f
+    - docker image prune -f
+
+# Override TBC
+.docker-dind-base:
+  extends: .docker-base
+  variables:
+    # We use the unix socket to connect to the host docker server
+    DOCKER_HOST: ""
+    _TRACE: "${TRACE}"
+  before_script:
+    - !reference [.docker-scripts]
+    - if ! wait_for_docker_daemon; then fail "Docker server is not reacheable on this runner. Either fix the runner configuration, or disable this job by setting \$DOCKER_BUILD_TOOL to a different value"; fi
+
+# Override TBC
+docker-dind-build:
+  extends: .docker-dind-base
+  script:
+    # Do not pull the image: just use the one on the docker builder
+    # - docker pull $DOCKER_SNAPSHOT_IMAGE || true
+    - |
+      if [ "$DOCKER_BUILD_CACHE_DISABLED" != "true" ]; then
+        dind_cache_args="--cache-from $DOCKER_SNAPSHOT_IMAGE"
+        log_info "Build cache enabled; CLI options: ${dind_cache_args}"
+      fi
+    # Build using cache if exist
+    - docker build --file "$DOCKER_FILE" ${dind_cache_args} --tag $DOCKER_SNAPSHOT_IMAGE --build-arg http_proxy="$http_proxy" --build-arg https_proxy="$https_proxy" --build-arg no_proxy="$no_proxy" $DOCKER_METADATA $DOCKER_BUILD_ARGS "$(docker_context_path)"
+    # Do not push the image: just keep it on the docker builder
+    # - docker push $DOCKER_SNAPSHOT_IMAGE
+    # Display the size of each layer
+    - docker history $DOCKER_SNAPSHOT_IMAGE
+    # Display the total size of the image
+    - docker images --digests $DOCKER_SNAPSHOT_IMAGE
+    # create dotenv file (without repository digest information)
+    - docker_digest=$(docker inspect --format '{{index .Id}}' "$DOCKER_SNAPSHOT_IMAGE")
+    - docker_repository=${DOCKER_SNAPSHOT_IMAGE%:*}
+    - docker_tag=${DOCKER_SNAPSHOT_IMAGE##*:}
+    - |
+      {
+        echo "docker_image=$DOCKER_SNAPSHOT_IMAGE"
+        echo "docker_image_digest=$docker_repository@$docker_digest"
+        echo "docker_repository=$docker_repository"
+        echo "docker_tag=$docker_tag"
+        echo "docker_digest=$docker_digest"
+      } > docker.env
+
+# Inspired from https://gitlab.com/to-be-continuous/docker/-/blob/master/templates/gitlab-ci-docker.yml?ref_type=heads#L537
+.docker-auth-release: &docker-auth-release |
+  function configure_registries_auth() {
+    docker_release_authent_token=$(echo -n "${DOCKER_REGISTRY_RELEASE_USER:-${DOCKER_REGISTRY_USER:-$CI_REGISTRY_USER}}:${DOCKER_REGISTRY_RELEASE_PASSWORD:-${DOCKER_REGISTRY_PASSWORD:-$CI_REGISTRY_PASSWORD}}" | base64 | tr -d '\n')
+    docker_release_registry_host=$(echo "$DOCKER_RELEASE_IMAGE" | cut -d/ -f1)
+    export docker_release_authent_token
+    export docker_release_registry_host
+
+    docker_release_config_json=$(echo -n "{\"auths\":{\"$docker_release_registry_host\":{\"auth\":\"$docker_release_authent_token\"},\"HttpHeaders\":{\"User-Agent\":\"$USER_AGENT\"}}}")
+
+    # Create the configuration file for Docker and Kaniko
+    BUILDTOOL_HOME=${BUILDTOOL_HOME:-$HOME}
+    mkdir -p "$BUILDTOOL_HOME/.docker"
+    if [ -f "${DOCKER_CONFIG_FILE}" ]
+    then
+      awkenvsubst < "${DOCKER_CONFIG_FILE}" > "$BUILDTOOL_HOME/.docker/config.json"
+    else
+      echo "${docker_release_config_json}" > "$BUILDTOOL_HOME/.docker/config.json"
+    fi
+
+    log_info "Docker authentication configured for \\e[33;1m${docker_release_registry_host}\\e[0m"
+  }
+
+  configure_registries_auth
+
+# Override TBC
+docker-publish:
+  extends: .docker-dind-base
+  image: $DOCKER_IMAGE
+  script:
+    - !reference [.docker-auth-release]
+    - |
+      if [[ "${SEMREL_INFO_ON}" && "${DOCKER_SEMREL_RELEASE_DISABLED}" != "true" ]]
+      then
+        if [[ -z "${SEMREL_INFO_NEXT_VERSION}" ]]
+        then
+          log_warn "[semantic-release] no new version to release: skip"
+          exit 0
+        else
+          DOCKER_RELEASE_IMAGE="${DOCKER_RELEASE_IMAGE%:*}:$SEMREL_INFO_NEXT_VERSION"
+          log_info "[semantic-release] new Image tag is set: $DOCKER_RELEASE_IMAGE"
+        fi
+      fi
+
+      if [[ "$DOCKER_SNAPSHOT_IMAGE" == "$DOCKER_RELEASE_IMAGE" ]]
+      then
+        log_warn "\\e[93mYou should consider distinguishing snapshot and release images as they do not differ. Skipping publish phase as image has already been created by previous job.\\e[0m"
+        exit 0
+      fi
+    # Change tag to latest when builing main branch
+    - |
+      if [[ "${DOCKER_RELEASE_IMAGE#*:}" == "main" ]]
+      then
+        DOCKER_RELEASE_IMAGE="${DOCKER_RELEASE_IMAGE/:main/:latest}"
+      fi
+    # 1: push main image
+    - docker tag $DOCKER_SNAPSHOT_IMAGE $DOCKER_RELEASE_IMAGE
+    - docker push $DOCKER_RELEASE_IMAGE
+    - |
+      log_info "Well done your image is pushed and can be pulled with: docker pull $DOCKER_RELEASE_IMAGE"
+    # 2: extract info and generate output dotenv
+    - docker_digest=$(docker inspect --format '{{index .Id}}' "$DOCKER_RELEASE_IMAGE")
+    - docker_repository=${DOCKER_RELEASE_IMAGE%:*}
+    - docker_tag=${DOCKER_RELEASE_IMAGE##*:}
+    - |
+      {
+        echo "docker_image=$DOCKER_RELEASE_IMAGE"
+        echo "docker_image_digest=$docker_repository@$docker_digest"
+        echo "docker_repository=$docker_repository"
+        echo "docker_tag=$docker_tag"
+        echo "docker_digest=$docker_digest"
+      } > docker.env
+    - publish_extra_tags
+
+# Override TBC
+# Use embed trivy for 4x faster trivy analysis.
+# Otherwise, trivy will be slow down by dockerd threads that seems limited to about 1.2 vCPU.
+# https://aquasecurity.github.io/trivy/v0.52/docs/advanced/container/embed-in-dockerfile/
+docker-trivy:
+  extends: .docker-dind-base
+  stage: package-test
+  image: $DOCKER_IMAGE
+  variables:
+    DOCKER_FILE: "/tmp/dockerfile"
+  script:
+    - |
+      # Prepare Dockerfile (1/2)
+      {
+        echo "# Run vulnerability scan on build image"
+        echo "FROM ${DOCKER_SNAPSHOT_IMAGE} AS vulnscan"
+        echo "COPY --from=aquasec/trivy:latest /usr/local/bin/trivy /usr/local/bin/trivy"
+        echo "COPY --from=aquasec/trivy:latest /contrib /contrib"
+      } > $DOCKER_FILE
+    - |
+      # Prepare Dockerfile (2/2)
+      # Add common trivy arguments
+      # The Java DB is downloaded client-side in client/server mode (https://github.com/aquasecurity/trivy/issues/3560), so we need to specify the Java DB repository
+      export trivy_opts="${DOCKER_TRIVY_JAVA_DB_REPOSITORY:+--java-db-repository $DOCKER_TRIVY_JAVA_DB_REPOSITORY} --no-progress --severity ${DOCKER_TRIVY_SECURITY_LEVEL_THRESHOLD} ${DOCKER_TRIVY_ARGS}"
+      {
+        echo "USER root"
+        echo "# GitLab format (no fail)"
+        echo "RUN trivy rootfs ${trivy_opts} --format template --exit-code 0 --template "@/contrib/gitlab.tpl" --output /docker-trivy.gitlab.json /"
+        echo "# console output (fail)"
+        echo "RUN trivy rootfs ${trivy_opts} --format table --exit-code 1 /"
+      } >> $DOCKER_FILE
+    - docker build --file "$DOCKER_FILE" ${dind_cache_args} --tag ${DOCKER_SNAPSHOT_IMAGE}-vulnscan "$(docker_context_path)"
+    - |
+      # Retrieve the report
+      mkdir -p ./reports
+      # Instanciate the container to copy the report
+      docker_vulnscan_container_name=$(echo $BASENAME-vulnscan-$CI_COMMIT_REF_SLUG-$CI_JOB_NAME_SLUG | cut -c "-63")
+      docker run --name ${docker_vulnscan_container_name} --detach --entrypoint sleep ${DOCKER_SNAPSHOT_IMAGE}-vulnscan 600
+      # Copy the report
+      basename=$(echo "${DOCKER_SNAPSHOT_IMAGE}" | sed 's|[/:]|_|g')
+      docker cp ${docker_vulnscan_container_name}:/docker-trivy.gitlab.json reports/docker-trivy-${basename}.gitlab.json
+      # Stop the container
+      docker rm --force ${docker_vulnscan_container_name}
+  rules:
+    - when: on_success
+      allow_failure: true # linux-libc-dev package from base ubuntu layer is frequently updated to fix CVE, requiring a frequent rebuild of VRE-OT
+
+
+vre-tests:
+  extends: .docker-dind-base
+  variables:
+    GIT_STRATEGY: none
+  dependencies: []
+  stage: package-test
+  script:
+    - |
+      docker_test_container_name=$(echo $BASENAME-$CI_COMMIT_REF_SLUG-$CI_JOB_NAME_SLUG | cut -c "-63")
+    # Remove previous test that may failed
+    - |
+      docker rm -f $docker_test_container_name || true
+    # Run the test container and the tests
+    - docker run --name $docker_test_container_name
+      --detach
+      $DOCKER_SNAPSHOT_IMAGE
+        --ip=0.0.0.0
+        --port=8892
+        --no-browser
+        --allow-root
+    - docker exec -t $docker_test_container_name bash /opt/vre/tests/vre_tests.sh
+    - docker stop $docker_test_container_name
+    - docker rm -f $docker_test_container_name
