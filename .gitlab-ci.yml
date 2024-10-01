@@ -26,6 +26,10 @@ docker-cleanup:
     # We use the unix socket to connect to the host docker server
     DOCKER_HOST: ""
     _TRACE: "${TRACE}"
+  # Remove the docker (dind) service, keeping only the TBC tracking service
+  services:
+    - name: "$TBC_TRACKING_IMAGE"
+      command: ["--service", "docker", "5.13.1"]
   before_script:
     - !reference [.docker-scripts]
     - if ! wait_for_docker_daemon; then fail "Docker server is not reacheable on this runner. Either fix the runner configuration, or disable this job by setting \$DOCKER_BUILD_TOOL to a different value"; fi
