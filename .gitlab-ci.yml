@@ -9,6 +9,7 @@ variables:
   DOCKER_BUILD_TOOL: dind
   DOCKER_HADOLINT_ARGS: --failure-threshold error
   DOCKER_HEALTHCHECK_DISABLED: "true"
+  DOCKER_SBOM_DISABLED: "true"
 
 ## Post stage
 
