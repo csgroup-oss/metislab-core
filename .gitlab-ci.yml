@@ -9,6 +9,7 @@ variables:
   DOCKER_BUILD_TOOL: dind
   DOCKER_HADOLINT_ARGS: --failure-threshold error
   DOCKER_HEALTHCHECK_DISABLED: "true"
+  DOCKER_SBOM_DISABLED: "true"
 
 ## Post stage
 
@@ -46,7 +47,7 @@ docker-dind-build:
         log_info "Build cache enabled; CLI options: ${dind_cache_args}"
       fi
     # Build using cache if exist
-    - docker build --file "$DOCKER_FILE" ${dind_cache_args} --tag $DOCKER_SNAPSHOT_IMAGE --build-arg http_proxy="$http_proxy" --build-arg https_proxy="$https_proxy" --build-arg no_proxy="$no_proxy" $DOCKER_METADATA $DOCKER_BUILD_ARGS "$(docker_context_path)"
+    - docker build --file "$DOCKER_FILE" ${dind_cache_args} --tag $DOCKER_SNAPSHOT_IMAGE --tag $BASENAME:latest --build-arg http_proxy="$http_proxy" --build-arg https_proxy="$https_proxy" --build-arg no_proxy="$no_proxy" $DOCKER_METADATA $DOCKER_BUILD_ARGS "$(docker_context_path)"
     # Do not push the image: just keep it on the docker builder
     # - docker push $DOCKER_SNAPSHOT_IMAGE
     # Display the size of each layer
