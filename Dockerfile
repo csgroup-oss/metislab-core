@@ -82,7 +82,7 @@ RUN \
         "jupyter-server-proxy~=4.1" \
         "jupyterhub~=4.1" \
         "jupyterlab-git~=0.44" \
-        "jupyterlab~=3.6" \
+        "jupyterlab~=4.4" \
         /opt/jupyter_proxy \
         && \
     rm -rf /opt/jupyter_proxy && \
