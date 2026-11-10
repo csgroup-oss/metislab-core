@@ -10,8 +10,8 @@ set -e
 # * https://github.com/manics/jupyter-omeroanalysis-desktop
 # * https://github.com/ml-tooling/ml-workspace
 
-NOVNC_VERSION=1.2.0
-TURBOVNC_VERSION=2.2.5
+NOVNC_VERSION=1.4.0
+TURBOVNC_VERSION=3.1
 
 # Generate a token at startup: it is the VNC password and is required by the Desktop launcher (NOVNC_TOKEN)
 cp resources/vnc/start-notebook-genvnctoken.sh /usr/local/bin/

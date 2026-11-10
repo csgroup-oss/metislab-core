@@ -1,5 +1,6 @@
-# Copyright 2020 CS GROUP - France, http://www.c-s.fr
+# Copyright 2024 CS GROUP - https://www.csgroup.eu
 # All rights reserved
+# This file is provided under MIT license. See LICENSE file.
 
 """
 Return config on servers
@@ -57,7 +58,6 @@ def setup_novnc():
             "-verbose",
             "-xstartup", "/usr/bin/dbus-launch xfce4-session",
             "-geometry", "1680x1050",
-            "-SecurityTypes", "None",
             "-fg"
         ]))
 
@@ -70,6 +70,10 @@ def setup_novnc():
             "/bin/sh", "-c", f"{vnc_command}"
         ]
 
+    novnc_token = os.getenv("NOVNC_TOKEN")
+    if not novnc_token:
+        raise TypeError("NOVNC_TOKEN not set")
+
     return {
         "command": _novnc_command,
         "timeout": 20,
@@ -78,7 +82,7 @@ def setup_novnc():
             "icon_path": os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "icons", "xfce.svg"
             ),
-            "path_info": "desktop/vnc.html?autoconnect=true"
+            "path_info": "desktop/vnc.html?autoconnect=true&password=" + novnc_token
         },
         "mappath": {"/": "/vnc.html"},
         "new_browser_tab": True,
