@@ -1,0 +1,13 @@
+# Packages not available (or not usable) from conda-forge
+awscli-plugin-endpoint
+ipyspin
+jupyter-launcher-shortcuts
+jupyterlab-katex
+jupyterlab-mathjax3
+jupyterlab-spreadsheet-editor
+jupyterlab-vega2
+jupyterlab-vega3
+pandoc
+pytest-tornado
+pytest-tornasync
+sidecar
