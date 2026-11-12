@@ -210,6 +210,6 @@ vre-tests:
         --port=8892
         --no-browser
         --allow-root
-    - docker exec -t $docker_test_container_name bash /opt/vre/tests/vre_tests.sh
+    - docker exec -t $docker_test_container_name bash /opt/vre/tests/metislab_tests.sh
     - docker stop $docker_test_container_name
     - docker rm -f $docker_test_container_name

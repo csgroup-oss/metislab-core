@@ -13,7 +13,7 @@ done
 # Exec Bash test files
 for file in /opt/vre/tests/*.sh
 do
-    if [ "$file" != "/opt/vre/tests/vre_tests.sh" ]; then
+    if [ "$file" != "/opt/vre/tests/metislab_tests.sh" ]; then
         echo "Testing $file..."
         bash "$file"
     fi
