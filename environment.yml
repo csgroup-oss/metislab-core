@@ -8,7 +8,8 @@ dependencies:
   - nodejs
   # Jupyter
   - jupyterlab
-  - jupyterhub-singleuser
+  # must match the version of the JupyterHub deployed (4.1.x)
+  - jupyterhub-singleuser=4.1
   - jupyter-server-proxy
   - jupyterlab-git
   - jupyter-resource-usage
