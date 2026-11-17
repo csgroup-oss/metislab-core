@@ -1,7 +1,7 @@
 
 include:
   - project: 'to-be-continuous/docker'
-    ref: '5.12.0'
+    ref: '8.5.3'
     file: '/templates/gitlab-ci-docker.yml'
 
 variables:
@@ -9,7 +9,7 @@ variables:
   DOCKER_BUILD_TOOL: dind
   DOCKER_HADOLINT_ARGS: --failure-threshold error
   DOCKER_HEALTHCHECK_DISABLED: "true"
-  DOCKER_SBOM_DISABLED: "true"
+  TBC_SBOM_MODE: always
 
 ## Post stage
 
