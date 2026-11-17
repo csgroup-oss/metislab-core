@@ -11,6 +11,7 @@ rm -rf /usr/local/src/*
 
 rm -rf /var/cache/apt/*
 rm -rf /root/.cache/*
+rm -rf /home/jovyan/.cache/*
 # including /root/.cache/pip
 rm -rf /usr/local/share/.cache/*
 # including /usr/local/share/.cache/yarn
