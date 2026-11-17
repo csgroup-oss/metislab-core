@@ -24,11 +24,6 @@ rclone
 rsync
 scrot
 silversearcher-ag
-texlive-fonts-recommended
-texlive-lang-french
-texlive-latex-extra
-texlive-plain-generic
-texlive-xetex
 tig
 tmux
 tree
