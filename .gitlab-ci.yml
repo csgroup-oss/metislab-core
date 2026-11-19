@@ -162,9 +162,9 @@ docker-trivy:
       } > $DOCKER_FILE
     - |
       # Prepare Dockerfile (2/2)
-      # Add common trivy arguments
+      # TBC 8.5.3 does not define the legacy severity threshold; honor it only when set.
       # The Java DB is downloaded client-side in client/server mode (https://github.com/aquasecurity/trivy/issues/3560), so we need to specify the Java DB repository
-      export trivy_opts="${DOCKER_TRIVY_JAVA_DB_REPOSITORY:+--java-db-repository $DOCKER_TRIVY_JAVA_DB_REPOSITORY} --no-progress --severity ${DOCKER_TRIVY_SECURITY_LEVEL_THRESHOLD} ${DOCKER_TRIVY_ARGS}"
+      export trivy_opts="${DOCKER_TRIVY_JAVA_DB_REPOSITORY:+--java-db-repository $DOCKER_TRIVY_JAVA_DB_REPOSITORY} --no-progress ${DOCKER_TRIVY_SECURITY_LEVEL_THRESHOLD:+--severity $DOCKER_TRIVY_SECURITY_LEVEL_THRESHOLD} ${DOCKER_TRIVY_ARGS}"
       {
         echo "USER root"
         echo "# GitLab format (no fail)"
