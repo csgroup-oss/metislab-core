@@ -1,14 +1,23 @@
 
 include:
-  - project: 'to-be-continuous/docker'
-    ref: '8.5.3'
-    file: '/templates/gitlab-ci-docker.yml'
+  # Docker template, component form: each setting is bound to an explicit input.
+  - component: $CI_SERVER_FQDN/to-be-continuous/docker/gitlab-ci-docker@8.5.3
+    inputs:
+      build-tool: dind
+      hadolint-args: '--failure-threshold error'
+      healthcheck-disabled: true
+  # semantic-release template, component form.
+  - component: $CI_SERVER_FQDN/to-be-continuous/semantic-release/gitlab-ci-semrel@4.3.0
+    inputs:
+      # Computes the next version from conventional commits on protected refs.
+      info-on: protected
+      # Publishing is handled by docker-publish (image tagging): no git tag is created here.
+      release-disabled: true
+      commit-spec: conventionalcommits
 
 variables:
   BASENAME: metislab-core
-  DOCKER_BUILD_TOOL: dind
-  DOCKER_HADOLINT_ARGS: --failure-threshold error
-  DOCKER_HEALTHCHECK_DISABLED: "true"
+  # Not exposed as a component input: stays a regular CI/CD variable.
   TBC_SBOM_MODE: always
 
 ## Post stage
