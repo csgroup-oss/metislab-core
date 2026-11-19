@@ -3,6 +3,9 @@ include:
   - project: 'to-be-continuous/docker'
     ref: '8.5.3'
     file: '/templates/gitlab-ci-docker.yml'
+  - project: 'to-be-continuous/semantic-release'
+    ref: '4.3.0'
+    file: '/templates/gitlab-ci-semrel.yml'
 
 variables:
   BASENAME: metislab-core
@@ -10,6 +13,13 @@ variables:
   DOCKER_HADOLINT_ARGS: --failure-threshold error
   DOCKER_HEALTHCHECK_DISABLED: "true"
   TBC_SBOM_MODE: always
+
+  # --- Release (semantic-release) ---
+  # Computes the next version from conventional commits on protected refs.
+  SEMREL_INFO_ON: "protected"
+  # Publishing is handled by docker-publish (image tagging): no git tag is created here.
+  SEMREL_RELEASE_DISABLED: "true"
+  SEMREL_COMMIT_SPEC: "conventionalcommits"
 
 ## Post stage
 
