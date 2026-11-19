@@ -1,7 +1,7 @@
 
 include:
   - project: 'to-be-continuous/docker'
-    ref: '5.12.0'
+    ref: '8.5.3'
     file: '/templates/gitlab-ci-docker.yml'
 
 variables:
@@ -9,7 +9,7 @@ variables:
   DOCKER_BUILD_TOOL: dind
   DOCKER_HADOLINT_ARGS: --failure-threshold error
   DOCKER_HEALTHCHECK_DISABLED: "true"
-  DOCKER_SBOM_DISABLED: "true"
+  TBC_SBOM_MODE: always
 
 ## Post stage
 
@@ -162,28 +162,34 @@ docker-trivy:
       } > $DOCKER_FILE
     - |
       # Prepare Dockerfile (2/2)
-      # Add common trivy arguments
+      # TBC 8.5.3 does not define the legacy severity threshold; honor it only when set.
       # The Java DB is downloaded client-side in client/server mode (https://github.com/aquasecurity/trivy/issues/3560), so we need to specify the Java DB repository
-      export trivy_opts="${DOCKER_TRIVY_JAVA_DB_REPOSITORY:+--java-db-repository $DOCKER_TRIVY_JAVA_DB_REPOSITORY} --no-progress --severity ${DOCKER_TRIVY_SECURITY_LEVEL_THRESHOLD} ${DOCKER_TRIVY_ARGS}"
-      {
-        echo "USER root"
-        echo "# GitLab format (no fail)"
-        echo "RUN trivy rootfs ${trivy_opts} --format template --exit-code 0 --template "@/contrib/gitlab.tpl" --output /docker-trivy.gitlab.json /"
-        echo "# console output (fail)"
-        echo "RUN trivy rootfs ${trivy_opts} --format table --exit-code 1 /"
-      } >> $DOCKER_FILE
+      export trivy_opts="${DOCKER_TRIVY_JAVA_DB_REPOSITORY:+--java-db-repository $DOCKER_TRIVY_JAVA_DB_REPOSITORY} --no-progress ${DOCKER_TRIVY_SECURITY_LEVEL_THRESHOLD:+--severity $DOCKER_TRIVY_SECURITY_LEVEL_THRESHOLD} ${DOCKER_TRIVY_ARGS}"
+      echo "USER root" >> "$DOCKER_FILE"
     - docker build --file "$DOCKER_FILE" ${dind_cache_args} --tag ${DOCKER_SNAPSHOT_IMAGE}-vulnscan "$(docker_context_path)"
     - |
-      # Retrieve the report
       mkdir -p ./reports
-      # Instanciate the container to copy the report
       docker_vulnscan_container_name=$(echo $BASENAME-vulnscan-$CI_COMMIT_REF_SLUG-$CI_JOB_NAME_SLUG | cut -c "-63")
       docker run --name ${docker_vulnscan_container_name} --detach --entrypoint sleep ${DOCKER_SNAPSHOT_IMAGE}-vulnscan 600
-      # Copy the report
       basename=$(echo "${DOCKER_SNAPSHOT_IMAGE}" | sed 's|[/:]|_|g')
-      docker cp ${docker_vulnscan_container_name}:/docker-trivy.gitlab.json reports/docker-trivy-${basename}.gitlab.json
-      # Stop the container
+      report_path="reports/docker-trivy-${basename}.gitlab.json"
+      docker exec "$docker_vulnscan_container_name" trivy rootfs ${trivy_opts} --format template --exit-code 0 --template "@/contrib/gitlab.tpl" --output /docker-trivy.gitlab.json /
+      docker cp "${docker_vulnscan_container_name}:/docker-trivy.gitlab.json" "$report_path"
+      cp "$report_path" reports/gl-container-scanning-report.json
+      if docker exec "$docker_vulnscan_container_name" trivy rootfs ${trivy_opts} --format table --exit-code 1 /; then
+        trivy_exit_code=0
+      else
+        trivy_exit_code=$?
+      fi
       docker rm --force ${docker_vulnscan_container_name}
+      exit "$trivy_exit_code"
+  artifacts:
+    when: always
+    paths:
+      - reports/docker-trivy-*.gitlab.json
+      - reports/gl-container-scanning-report.json
+    reports:
+      container_scanning: reports/gl-container-scanning-report.json
   rules:
     - when: on_success
       allow_failure: true # linux-libc-dev package from base ubuntu layer is frequently updated to fix CVE, requiring a frequent rebuild of VRE-OT
@@ -205,10 +211,11 @@ vre-tests:
     - docker run --name $docker_test_container_name
       --detach
       $DOCKER_SNAPSHOT_IMAGE
+        jupyter lab
         --ip=0.0.0.0
         --port=8892
         --no-browser
         --allow-root
-    - docker exec -t $docker_test_container_name bash /opt/vre/tests/vre_tests.sh
+    - docker exec -t $docker_test_container_name bash /opt/vre/tests/metislab_tests.sh
     - docker stop $docker_test_container_name
     - docker rm -f $docker_test_container_name

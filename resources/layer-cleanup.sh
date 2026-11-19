@@ -1,16 +1,17 @@
 #!/bin/bash
-# Copyright 2020 CS GROUP - France, http://www.c-s.fr
+# Copyright 2024 CS GROUP - https://www.csgroup.eu
 # All rights reserved
+# This file is provided under MIT license. See LICENSE file.
 
 apt-get autoclean --yes
 apt-get autoremove --yes
 
 rm -rf /var/lib/apt/lists/*
-rm -rf /etc/apt/sources.list.d/*
 rm -rf /usr/local/src/*
 
 rm -rf /var/cache/apt/*
 rm -rf /root/.cache/*
+rm -rf /home/jovyan/.cache/*
 # including /root/.cache/pip
 rm -rf /usr/local/share/.cache/*
 # including /usr/local/share/.cache/yarn
@@ -24,5 +25,7 @@ if [ -x "$(command -v npm)" ]; then
 fi
 
 rm -rf /tmp/* /var/tmp/*
+
+echo "Layer cleaned"
 
 exit 0

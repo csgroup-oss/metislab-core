@@ -1,5 +1,6 @@
-# Copyright 2020 CS GROUP - France, http://www.c-s.fr
+# Copyright 2024 CS GROUP - https://www.csgroup.eu
 # All rights reserved
+# This file is provided under MIT license. See LICENSE file.
 
 """
 Return config on servers
@@ -26,7 +27,11 @@ def setup_codeserver():
 
         return [
             full_path,
-            "--port=" + str(port),
+            # Authentication is handled by Jupyter/JupyterHub: code-server is
+            # only reachable through jupyter-server-proxy. Bind explicitly to
+            # loopback so that it can never be reached directly from outside
+            # the container.
+            "--bind-addr", "127.0.0.1:" + str(port),
             "--auth",
             "none",
             "--disable-telemetry",
@@ -57,18 +62,21 @@ def setup_novnc():
             "-verbose",
             "-xstartup", "/usr/bin/dbus-launch xfce4-session",
             "-geometry", "1680x1050",
-            "-SecurityTypes", "None",
             "-fg"
         ]))
 
         return [
             "websockify", "-v",
-            "--web", "/opt/noVNC-1.2.0",
+            "--web", "/opt/noVNC",
             "--heartbeat", "30",
             str(port),
             "--",
             "/bin/sh", "-c", f"{vnc_command}"
         ]
+
+    novnc_token = os.getenv("NOVNC_TOKEN")
+    if not novnc_token:
+        raise TypeError("NOVNC_TOKEN not set")
 
     return {
         "command": _novnc_command,
@@ -78,7 +86,7 @@ def setup_novnc():
             "icon_path": os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "icons", "xfce.svg"
             ),
-            "path_info": "desktop/vnc.html?autoconnect=true"
+            "path_info": "desktop/vnc.html?autoconnect=true&password=" + novnc_token
         },
         "mappath": {"/": "/vnc.html"},
         "new_browser_tab": True,

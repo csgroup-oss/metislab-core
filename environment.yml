@@ -1,0 +1,71 @@
+name: notebook
+channels:
+  - conda-forge
+dependencies:
+  # python >=3.14 breaks dask-labextension (asyncio.get_event_loop no longer creates a loop)
+  - python=3.12
+  - pip
+  - nodejs
+  # Jupyter
+  - jupyterlab
+  # must match the version of the JupyterHub deployed (4.1.x)
+  - jupyterhub-singleuser=4.1
+  - jupyter-server-proxy
+  - jupyterlab-git
+  - jupyter-resource-usage
+  - jupytext
+  - nbgitpuller
+  - ipympl
+  - ipywidgets
+  - voila
+  - papermill
+  # Dask
+  - dask
+  - dask-gateway
+  - dask-jobqueue
+  - dask-labextension
+  - distributed
+  # Scientific stack
+  - bokeh
+  - bqplot
+  - datashader
+  - numba
+  - numexpr
+  - numpy
+  - numpy-stl
+  - pandas
+  - plotly
+  - pytables
+  - pyviz_comms
+  - scikit-image
+  - scipy
+  - seaborn
+  - statsmodels
+  - xarray
+  - matplotlib
+  # Storage
+  - boto3
+  - fsspec
+  - s3fs
+  # Development tools
+  - black
+  - cookiecutter
+  - cython
+  - flake8
+  - graphviz
+  - isort
+  - jinja2
+  - packaging
+  - pipdeptree
+  - pre-commit
+  - pylint
+  - pyparsing
+  - pyscaffold
+  - pytest
+  - pytest-cov
+  - python-dotenv
+  - schema
+  - termcolor
+  - tox
+  - virtualenv
+  - websockify
