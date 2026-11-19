@@ -1,8 +1,13 @@
 #!/bin/bash
-# Copyright 2022 CS GROUP - France, http://www.c-s.fr
+# Copyright 2024 CS GROUP - https://www.csgroup.eu
 # All rights reserved
+# This file is provided under MIT license. See LICENSE file.
 
 # VSCode base extensions copy if not already set
+export PATH=/opt/code-server/bin:$PATH
+export VSCODE_EXTENSIONS=/opt/code-server/extensions
+export NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+
 VSCODE_EXTENSIONS_DIR=$HOME/.vscode/extensions
 echo "INFO: VSCode extensions folder set up in $VSCODE_EXTENSIONS_DIR"
 mkdir -p $VSCODE_EXTENSIONS_DIR

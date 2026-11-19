@@ -27,7 +27,11 @@ def setup_codeserver():
 
         return [
             full_path,
-            "--port=" + str(port),
+            # Authentication is handled by Jupyter/JupyterHub: code-server is
+            # only reachable through jupyter-server-proxy. Bind explicitly to
+            # loopback so that it can never be reached directly from outside
+            # the container.
+            "--bind-addr", "127.0.0.1:" + str(port),
             "--auth",
             "none",
             "--disable-telemetry",
