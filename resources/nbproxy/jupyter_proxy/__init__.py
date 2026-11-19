@@ -63,7 +63,7 @@ def setup_novnc():
 
         return [
             "websockify", "-v",
-            "--web", "/opt/noVNC-1.2.0",
+            "--web", "/opt/noVNC",
             "--heartbeat", "30",
             str(port),
             "--",

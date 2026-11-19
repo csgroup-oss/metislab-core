@@ -10,50 +10,38 @@ set -e
 # * https://github.com/manics/jupyter-omeroanalysis-desktop
 # * https://github.com/ml-tooling/ml-workspace
 
-apt-get update --quiet
-apt-get install --quiet --yes --no-install-recommends \
-    # provides add-apt-repository
-    software-properties-common
-add-apt-repository ppa:mozillateam/ppa --yes
-apt-get update --quiet
-DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet --no-install-recommends \
-    dconf-cli \
-    dbus-x11 \
-    evince \
-    file-roller \
-    firefox-esr \
-    geeqie \
-    thunar-archive-plugin \
-    xfce4 \
-    xfce4-panel \
-    xfce4-session \
-    xfce4-settings \
-    xorg \
-    xubuntu-icon-theme
+NOVNC_VERSION=1.2.0
+TURBOVNC_VERSION=2.2.5
 
-curl -sSfL https://github.com/novnc/noVNC/archive/v1.2.0.tar.gz | tar -zxf - -C /opt
+# Generate a token at startup: it is the VNC password and is required by the Desktop launcher (NOVNC_TOKEN)
+cp resources/vnc/start-notebook-genvnctoken.sh /usr/local/bin/
+chmod +x /usr/local/bin/start-notebook-genvnctoken.sh
+
+curl -sSfL https://github.com/novnc/noVNC/archive/v${NOVNC_VERSION}.tar.gz | tar -zxf - -C /opt
+mv /opt/noVNC-${NOVNC_VERSION} /opt/noVNC
 # Fix VNC client
-chmod o+r /opt/vnc.html
-chmod o+r /opt/ui.js
-mv /opt/vnc.html /opt/noVNC-1.2.0
-mv /opt/ui.js /opt/noVNC-1.2.0/app
-wget 'https://sourceforge.net/projects/turbovnc/files/2.2.5/turbovnc_2.2.5_amd64.deb/download' -O turbovnc_2.2.5_amd64.deb
-apt-get install -y -q ./turbovnc_2.2.5_amd64.deb
-rm ./turbovnc_2.2.5_amd64.deb
+install -m 644 resources/vnc/vnc.html /opt/noVNC/vnc.html
+install -m 644 resources/vnc/ui.js /opt/noVNC/app/ui.js
+
+wget -q "https://github.com/TurboVNC/turbovnc/releases/download/${TURBOVNC_VERSION}/turbovnc_${TURBOVNC_VERSION}_amd64.deb" -O turbovnc.deb
+apt-get update --quiet
+apt-get install --quiet --yes --no-install-recommends ./turbovnc.deb
+rm ./turbovnc.deb
 ln -s /opt/TurboVNC/bin/* /usr/local/bin/
-pip install --quiet --upgrade "websockify~=0.10"
-# Fix missing rebind.so issue
-cd /opt && git clone --quiet https://github.com/novnc/websockify.git
-cd /opt/websockify && make && cp rebind.so /usr/local/bin
-# Remove mail and logout desktop icons
-rm /usr/share/applications/xfce4-session-logout.desktop
-apt purge --quiet --yes xfce4-screensaver
-# Remove lite client as the full client is the one being used in the Desktop Launcher
-rm /opt/noVNC-1.2.0/vnc_lite.html
 
 # Customize Desktop
-mkdir -p /opt/vre
+mkdir -p /opt/vre /etc/xdg/xfce4/xfconf
 cp resources/branding/desktop/wallpaper.png /opt/vre/wallpaper.png
-mkdir -p /etc/xdg/xfce4/xfconf
-cp -r resources/branding/desktop/xfce-perchannel-xml /etc/xdg/xfce4/xfconf/xfce-perchannel-xml
+cp -r resources/branding/desktop/xfce-perchannel-xml /etc/xdg/xfce4/xfconf/
 chmod 664 /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/*
+
+# Fix missing rebind.so issue
+git clone --quiet https://github.com/novnc/websockify.git /opt/websockify
+make -C /opt/websockify
+cp /opt/websockify/rebind.so /usr/local/bin
+
+# Remove logout desktop icon and screensaver
+rm -f /usr/share/applications/xfce4-session-logout.desktop
+apt-get purge --quiet --yes xfce4-screensaver || true
+# Remove lite client as the full client is the one being used in the Desktop Launcher
+rm /opt/noVNC/vnc_lite.html
