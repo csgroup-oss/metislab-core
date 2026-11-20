@@ -6,13 +6,14 @@ include:
       build-tool: dind
       hadolint-args: '--failure-threshold error'
       healthcheck-disabled: true
+      # The snapshot image is only tagged locally, never pushed: --cache-from
+      # would only add a registry round-trip. Keep the build strictly local.
+      build-cache-disabled: true
   # semantic-release template, component form.
   - component: $CI_SERVER_FQDN/to-be-continuous/semantic-release/gitlab-ci-semrel@4.3.0
     inputs:
       # Computes the next version from conventional commits on protected refs.
       info-on: protected
-      # Publishing is handled by docker-publish (image tagging): no git tag is created here.
-      release-disabled: true
       commit-spec: conventionalcommits
 
 variables:
