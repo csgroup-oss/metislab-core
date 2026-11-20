@@ -14,8 +14,6 @@ include:
     inputs:
       # Computes the next version from conventional commits on protected refs.
       info-on: protected
-      # Publishing is handled by docker-publish (image tagging): no git tag is created here.
-      release-disabled: true
       commit-spec: conventionalcommits
 
 variables:
