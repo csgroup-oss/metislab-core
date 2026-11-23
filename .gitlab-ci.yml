@@ -18,6 +18,8 @@ include:
 
 variables:
   BASENAME: metislab-core
+  # Public GitHub mirror
+  GITHUB_REPO: csgroup-oss/$BASENAME
   # Not exposed as a component input: stays a regular CI/CD variable.
   TBC_SBOM_MODE: always
 
@@ -229,3 +231,34 @@ vre-tests:
     - docker exec -t $docker_test_container_name bash /opt/vre/tests/metislab_tests.sh
     - docker stop $docker_test_container_name
     - docker rm -f $docker_test_container_name
+
+github-release:
+  stage: publish
+  image: alpine:3.20
+  variables:
+    GIT_DEPTH: 0
+  needs:
+    # SEMREL_INFO_NEXT_VERSION comes from the semantic-release info dotenv.
+    - job: semantic-release-info
+    # Pull the SBOM artifacts produced by docker-sbom.
+    - job: docker-sbom
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_REF_NAME =~ /^(main|master)$/ && $SEMREL_INFO_NEXT_VERSION'
+      when: manual
+      allow_failure: true
+  before_script:
+    - apk add --no-cache github-cli git
+  script:
+    - ': "${GH_TOKEN:?GH_TOKEN is required to push and create the GitHub release}"'
+    - VERSION="$SEMREL_INFO_NEXT_VERSION"
+    # Push the current commit to GitHub so the release can target its SHA.
+    - git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPO}.git" "HEAD:refs/heads/$CI_COMMIT_REF_NAME"
+    # Create the GitHub release (creates the tag on the pushed SHA) and attach the SBOM.
+    - |
+      gh release create "$VERSION" \
+        --repo "$GITHUB_REPO" \
+        --target "$CI_COMMIT_SHA" \
+        --title "$VERSION" \
+        --notes "Automated release $VERSION" \
+        reports/docker-sbom-*.cyclonedx.json
