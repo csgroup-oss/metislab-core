@@ -233,7 +233,7 @@ vre-tests:
     - docker rm -f $docker_test_container_name
 
 github-release:
-  stage: .post
+  stage: publish
   image: alpine:3.20
   variables:
     GIT_DEPTH: 0
